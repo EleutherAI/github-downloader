@@ -28,17 +28,15 @@ REMAINING_REQUESTS = 30
 
 
 
-def save_ckpt(lower_bound: int, upper_bound: int):
-    global repo_list
+def save_ckpt(lower_bound: int, upper_bound: int, repo_list):
     repo_list = list(set(repo_list)) # remove duplicates
     print(f"Saving checkpoint {lower_bound, upper_bound}...")
     with open('repo_ckpt.pkl', 'wb') as f:
         pickle.dump((lower_bound, upper_bound, repo_list), f)
 
-def get_request(lower_bound: int, upper_bound: int, page: int = 1):
+def get_request(lower_bound: int, upper_bound: int, repo_list, page: int = 1):
     # Returns a request object from querying GitHub 
     # for repos in-between size lower_bound and size upper_bound with over 100 stars.
-    global REMAINING_REQUESTS, USER, TOKEN, repo_list
     r = requests.get(
            f'https://api.github.com/search/repositories?q=size:{lower_bound}..{upper_bound}+stars:>100&per_page=100&page={page}',
            auth = (USER, TOKEN)
@@ -67,19 +65,18 @@ def get_request(lower_bound: int, upper_bound: int, page: int = 1):
     if REMAINING_REQUESTS == 0:
         print("Sleeping 60 seconds to stay under GitHub API rate limit...")
         time.sleep(60)
-        save_ckpt(lower_bound, upper_bound)
+        save_ckpt(lower_bound, upper_bound, repo_list)
         REMAINING_REQUESTS = 30
 
     return r
 
 
-def download_range(lower_bound, upper_bound):
+def download_range(lower_bound, upper_bound, repo_list):
     # Saves the names of repositories on GitHub to repo_list
     # in-between size minimum and maximum with over 100 stars.
-    global repo_list
     # Github page options start at index 1.
     for page in range(1, 11):
-        r = get_request(lower_bound=lower_bound, upper_bound=upper_bound, page=page)
+        r = get_request(lower_bound=lower_bound, upper_bound=upper_bound, repo_list=repo_list, page=page)
 
         if page == 1:
             n_results = r.json()['total_count']
@@ -116,7 +113,7 @@ Please delete `repo_ckpt.pkl` to restart and try again.
         exit()
 
     
-    r = get_request(lower_bound, upper_bound)
+    r = get_request(lower_bound, upper_bound, repo_list)
 
     # Initial number of results
     n_results = r.json()['total_count']
@@ -147,7 +144,7 @@ Please delete `repo_ckpt.pkl` to restart and try again.
                 break
 
         print(f"Downloading repositories in size range {lower_bound}..{upper_bound}")
-        download_range(lower_bound, upper_bound)
+        download_range(lower_bound, upper_bound, repo_list)
         lower_bound = upper_bound + 1
 
     save_ckpt(lower_bound, upper_bound)
